@@ -191,6 +191,8 @@ void sendKeystroke()
       if (!sentSingleCommand)
       {
         Serial.println("Play pause");
+        Keyboard.press(KEY_MEDIA_PLAY_PAUSE);
+        Keyboard.release(KEY_MEDIA_PLAY_PAUSE);
         sentSingleCommand = true;
       }
       break;
@@ -203,9 +205,13 @@ void sendKeystroke()
       break;
     case VOLUMEUP:
       Serial.println("Up");
+      Keyboard.press(KEY_MEDIA_VOLUME_INC);
+      Keyboard.release(KEY_MEDIA_VOLUME_INC);
       break;
     case VOLUMEDOWN:
       Serial.println("Down");
+      Keyboard.press(KEY_MEDIA_VOLUME_DEC);
+      Keyboard.release(KEY_MEDIA_VOLUME_DEC);
       break;
   }
   
