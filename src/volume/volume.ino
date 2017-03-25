@@ -30,7 +30,7 @@ void setup() {
   // initialize the digital pin as an output.
   pinMode(ledPin, OUTPUT);
   pinMode(dataPin, INPUT);
-  Serial.begin(9600);
+  //Serial.begin(9600);
   smoothReading = reading = analogRead(dataPin);
   initializationStep = 0;
   state = INITIALIZING;
@@ -77,8 +77,8 @@ void initialize()
   if (initializationStep == 10)
   {
     defaultReading = defaultReadingSum / 10;
-    Serial.print("Default reading: ");
-    Serial.println(defaultReading);
+    //Serial.print("Default reading: ");
+    //Serial.println(defaultReading);
     state = DETECTCENTER;
   }
   delay(100);
@@ -87,7 +87,7 @@ void initialize()
 void detectCenter()
 {
   digitalWrite(ledPin, HIGH);
-  Serial.print("Hold hand in the center...");
+  //Serial.print("Hold hand in the center...");
   delay(2000);
   reading = analogRead(dataPin);
   smoothReading = reading;
@@ -109,10 +109,10 @@ void detectCenter()
   centerReading = smoothReading;
   topReading = centerReading * 1.2;
   bottomReading = centerReading * 0.8;
-  Serial.print("Center reading: ");
-  Serial.println(centerReading);
+  //Serial.print("Center reading: ");
+  //Serial.println(centerReading);
   state = DETECTBOTTOM;
-  Serial.println("Hold hand at the bottom...");
+  //Serial.println("Hold hand at the bottom...");
   delay(500);
 }
 
@@ -122,8 +122,8 @@ void detectBottom()
   {
     digitalWrite(ledPin, HIGH);
     bottomReading = smoothReading;
-    Serial.print("Lowest reading:");
-    Serial.println(bottomReading);
+    //Serial.print("Lowest reading:");
+    //Serial.println(bottomReading);
   }
   else
   {
@@ -134,7 +134,7 @@ void detectBottom()
   if (smoothReading > centerReading * 1.2)
   {
     state = DETECTTOP;
-    Serial.println("Hold hand at the top...");
+    //Serial.println("Hold hand at the top...");
   }
 }
 
@@ -144,8 +144,8 @@ void detectTop()
   {
     digitalWrite(ledPin, HIGH);
     topReading = smoothReading;
-    Serial.print("Highest reading:");
-    Serial.println(topReading);
+    //Serial.print("Highest reading:");
+    //Serial.println(topReading);
   }
   else
   {
@@ -155,7 +155,7 @@ void detectTop()
 
   if (smoothReading < centerReading * 0.8)
   {
-    Serial.println("All done!");
+    //Serial.println("All done!");
     state = IDLE;
   }
 }
@@ -190,7 +190,7 @@ void sendKeystroke()
     case PLAYPAUSE:
       if (!sentSingleCommand)
       {
-        Serial.println("Play pause");
+        //Serial.println("Play pause");
         Keyboard.press(KEY_MEDIA_PLAY_PAUSE);
         Keyboard.release(KEY_MEDIA_PLAY_PAUSE);
         sentSingleCommand = true;
@@ -199,17 +199,17 @@ void sendKeystroke()
     case VOLUMEMUTE:
       if (!sentSingleCommand)
       {
-        Serial.println("Mute");
+        //Serial.println("Mute");
         sentSingleCommand = true;
       }
       break;
     case VOLUMEUP:
-      Serial.println("Up");
+      //Serial.println("Up");
       Keyboard.press(KEY_MEDIA_VOLUME_INC);
       Keyboard.release(KEY_MEDIA_VOLUME_INC);
       break;
     case VOLUMEDOWN:
-      Serial.println("Down");
+      //Serial.println("Down");
       Keyboard.press(KEY_MEDIA_VOLUME_DEC);
       Keyboard.release(KEY_MEDIA_VOLUME_DEC);
       break;
