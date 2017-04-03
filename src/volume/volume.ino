@@ -1,225 +1,154 @@
 int reading;
-int smoothReading;
 int initializationStep; // we take 10 measurements to initialize
-int centerReading;
-int bottomReading;
-int topReading;
+int listeningStep;
 int defaultReading; // idle reading
-int defaultReadingSum; // used to calculate defaultReading
+int defaultReadingSum;
+int slopeSum;
+int[] rawBuffer = int[3];
+int filteredReading;
+int[] listeningBuffer = int[2];
 bool sentSingleCommand; // used for debouncing mute and play buttons
 
 // State machine
 int state;
-const int INITIALIZING = 0; // go to 6
-const int DETECTCENTER = 6; // go to 7
-const int DETECTBOTTOM = 7; // go to 8
-const int DETECTTOP = 8; // go to 1
-const int IDLE = 1; // go to 2,3,4,5
-const int VOLUMEDOWN = 2; // go to 1
-const int VOLUMEUP = 3; // go to 1
-const int VOLUMEMUTE = 4; // go to 1
-const int PLAYPAUSE = 5; // go to 1
+const int INITIALIZING = 0; // Spend 10 cycles establishing defaultReading
+const int READY = 1; // When filteredReading < defaultReading * GESTURE_FACTOR
+const int LISTENING = 2; // else
+
+int gesture;
+const int NONE = 0;
+const int VOLUMEDOWN = 1;
+const int VOLUMEUP = 2;
+const int PLAYPAUSE = 3;
+//const int VOLUMEMUTE = 4; // Not implemented yet
+
+// Parameters
+const int SPIKE_THRESHOLD = 100;
+const float GESTURE_FACTOR = 1.25;
+const int LISTEN_IGNORE_COUNT = 10;
+const int LISTEN_MEASURE_COUNT = 40;
+const float SLOPE_FACTOR = 3.0;
 
 // Pins
 const int ledPin = 11;
 const int dataPin = 22;
 
-// the setup() method runs once, when the sketch starts
-
 void setup() {
   // initialize the digital pin as an output.
   pinMode(ledPin, OUTPUT);
   pinMode(dataPin, INPUT);
-  //Serial.begin(9600);
-  smoothReading = reading = analogRead(dataPin);
+  reading = analogRead(dataPin);
   initializationStep = 0;
+  listeningStep = 0;
   state = INITIALIZING;
+  rawBuffer = [reading, reading, reading];
+  filteredReading = reading;
+  Serial.begin(9600);
   delay(1000);
 }
 
-// the loop() methor runs over and over again,
-// as long as the board has power
-
 void loop() {
   reading = analogRead(dataPin);
-  smoothReading = (smoothReading + reading) / 2;
-  if (state == INITIALIZING)
-  {
-    initialize();
-  }
-  else if (state == DETECTCENTER)
-  {
-    detectCenter();
-  }
-  else if (state == DETECTBOTTOM)
-  {
-    detectBottom();
-  }
-  else if (state == DETECTTOP)
-  {
-    detectTop();
-  }
-  else if (state == IDLE)
-  {
-    measure();
-  }
-  else
-  {
-    sendKeystroke();
-  }
-  //Serial.println(reading);
+  filter();
+  setState();
+  sendKeystroke();
+  delay(20);
 }
 
-void initialize()
-{
-  defaultReadingSum += reading;
-  initializationStep++;
-  if (initializationStep == 10)
-  {
-    defaultReading = defaultReadingSum / 10;
-    //Serial.print("Default reading: ");
-    //Serial.println(defaultReading);
-    state = DETECTCENTER;
+// Step 1: Remove spikes from the reading
+void filter() {
+  rawBuffer[2] = rawBuffer[1];
+  rawBuffer[1] = rawBuffer[0];
+  rawBuffer[0] = reading;
+
+  int magnitude = rawBuffer[0]-rawBuffer[1] + rawBuffer[1]-rawBuffer[2];
+  int absolute = abs(rawBuffer[0]-rawBuffer[1]) + abs(rawBuffer[1]-rawBuffer[2]);
+  int delta = absolute - abs(magnitude);
+
+  if (delta < SPIKE_THRESHOLD) {
+    filteredReading = rawBuffer[1];
+  } else {
+    filteredReading = (rawBuffer[0] + rawBuffer[2])/2;
   }
-  delay(100);
 }
 
-void detectCenter()
-{
-  digitalWrite(ledPin, HIGH);
-  //Serial.print("Hold hand in the center...");
-  delay(2000);
-  reading = analogRead(dataPin);
-  smoothReading = reading;
+// Step 2: Determine what to do
+void setState() {
+  // If we're initializing, take 10 measurements to find the baseline
+  if (state == INITIALIZING) {
+    defaultReadingSum += filteredReading;
+    initializationStep++;
+    if (initializationStep == 10) {
+      defaultReading = defaultReadingSum / 10;
+      state = READY;
+    }
+    return;
+  }
+  if (filteredReading > defaultReading * GESTURE_FACTOR) {
+    state = LISTENING;
+    listeningStep++;
+  } else {
+    state = READY;
+    listeningStep = 0;
+    gesture = NONE;
+  }
 
-  for (int i = 4; i > 0; i--)
-  {
-    digitalWrite(ledPin, LOW);
-    delay(i * 100);
-    reading = analogRead(dataPin);
-    smoothReading = (smoothReading + reading) / 2;
+  if (state == LISTENING) {
+    listeningBuffer[1] = listeningBuffer[0];
+    listeningBuffer[0] = filteredReading;
+    int slope = listeningBuffer[0] - listeningBuffer[1];
+    if (listeningStep < 10) {
+      slopeSum = 0;
+      return;
+    } else if (listeningStep < 50) {
+      slopeSum += slope;
+    } else if (listeningStep == 50) {
+      if (slopeSum > LISTEN_MEASURE_COUNT * SLOPE_FACTOR) {
+        gesture = VOLUMEUP;
+      }
+      else if (slopeSum > LISTEN_MEASURE_COUNT * SLOPE_FACTOR * (-1)) {
+        gesture = VOLUMEDOWN;
+      }
+      else {
+        gesture = PLAYPAUSE;
+      }
+    }
+  }
   
-    digitalWrite(ledPin, HIGH);
-    delay(i * 100);
-    reading = analogRead(dataPin);
-    smoothReading = (smoothReading + reading) / 2;    
-  }
-
-  digitalWrite(ledPin, LOW);
-  centerReading = smoothReading;
-  topReading = centerReading * 1.2;
-  bottomReading = centerReading * 0.8;
-  //Serial.print("Center reading: ");
-  //Serial.println(centerReading);
-  state = DETECTBOTTOM;
-  //Serial.println("Hold hand at the bottom...");
-  delay(500);
-}
-
-void detectBottom()
-{
-  if (smoothReading < bottomReading)
-  {
-    digitalWrite(ledPin, HIGH);
-    bottomReading = smoothReading;
-    //Serial.print("Lowest reading:");
-    //Serial.println(bottomReading);
-  }
-  else
-  {
-    digitalWrite(ledPin, LOW);
-  }
-  delay(100);
-
-  if (smoothReading > centerReading * 1.2)
-  {
-    state = DETECTTOP;
-    //Serial.println("Hold hand at the top...");
-  }
-}
-
-void detectTop()
-{
-  if (smoothReading > topReading)
-  {
-    digitalWrite(ledPin, HIGH);
-    topReading = smoothReading;
-    //Serial.print("Highest reading:");
-    //Serial.println(topReading);
-  }
-  else
-  {
-    digitalWrite(ledPin, LOW);
-  }
-  delay(100);
-
-  if (smoothReading < centerReading * 0.8)
-  {
-    //Serial.println("All done!");
-    state = IDLE;
-  }
-}
-
-void measure()
-{
-  digitalWrite(ledPin, LOW);
-  if (smoothReading > (centerReading + topReading * 4) / 5)
-  {
-    state = PLAYPAUSE;
-    sentSingleCommand = false;
-  }
-  else if (smoothReading > (centerReading + topReading) / 2)
-  {
-    state = VOLUMEUP;
-  }
-  else if (smoothReading < (centerReading + bottomReading * 4) / 5)
-  {
-    state = VOLUMEMUTE;
-  }
-  else if (smoothReading < (centerReading + bottomReading) / 2)
-  {
-    state = VOLUMEDOWN;
-  }
 }
 
 void sendKeystroke()
 {
   digitalWrite(ledPin, HIGH);
-  switch (state)
+  switch (gesture)
   {
     case PLAYPAUSE:
       if (!sentSingleCommand)
       {
-        //Serial.println("Play pause");
-        Keyboard.press(KEY_MEDIA_PLAY_PAUSE);
-        Keyboard.release(KEY_MEDIA_PLAY_PAUSE);
+        Serial.println("Play pause");
+        //Keyboard.press(KEY_MEDIA_PLAY_PAUSE);
+        //Keyboard.release(KEY_MEDIA_PLAY_PAUSE);
         sentSingleCommand = true;
       }
       break;
+      /*
     case VOLUMEMUTE:
       if (!sentSingleCommand)
       {
         //Serial.println("Mute");
         sentSingleCommand = true;
       }
-      break;
+      break;*/ 
     case VOLUMEUP:
-      //Serial.println("Up");
-      Keyboard.press(KEY_MEDIA_VOLUME_INC);
-      Keyboard.release(KEY_MEDIA_VOLUME_INC);
+      Serial.println("Up");
+      //Keyboard.press(KEY_MEDIA_VOLUME_INC);
+      //Keyboard.release(KEY_MEDIA_VOLUME_INC);
       break;
     case VOLUMEDOWN:
-      //Serial.println("Down");
-      Keyboard.press(KEY_MEDIA_VOLUME_DEC);
-      Keyboard.release(KEY_MEDIA_VOLUME_DEC);
+      Serial.println("Down");
+      //Keyboard.press(KEY_MEDIA_VOLUME_DEC);
+      //Keyboard.release(KEY_MEDIA_VOLUME_DEC);
       break;
   }
-  
-  if ((smoothReading < defaultReading + 40) 
-  || (smoothReading > defaultReading - 40))
-  {
-    state = IDLE;
-  }
-  delay(150);
 }
 
