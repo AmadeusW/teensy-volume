@@ -17,14 +17,36 @@
 void setup()
 {                
   Serial.begin(38400);
+  delay(1000);
 }
 
 int val;
 
 void loop()                     
 {
-  val = analogRead(22);
-  Serial.println(val);
-  delay(10);
+  Serial.println("---Delay 10");
+  for (int i = 0; i < 100; i++) {
+    val = analogRead(22);
+    Serial.println(val);
+    delay(10);
+  }
+  Serial.println("---Delay 1");
+  for (int i = 0; i < 100; i++) {
+    val = analogRead(22);
+    Serial.println(val);
+    delay(1);
+  }
+  Serial.println("---Delay 25");
+  for (int i = 0; i < 100; i++) {
+    val = analogRead(22);
+    Serial.println(val);
+    delay(25);
+  }
+  Serial.println("---Delay 50");
+  for (int i = 0; i < 100; i++) {
+    val = analogRead(22);
+    Serial.println(val);
+    delay(50);
+  }
 }
 
