@@ -26,8 +26,11 @@ const int PLAYPAUSE = 3;
 const int SPIKE_THRESHOLD = 50;
 const float GESTURE_FACTOR = 1.25;
 const int LISTEN_IGNORE_COUNT = 10;
-const int LISTEN_MEASURE_COUNT = 10;
+const int LISTEN_MEASURE_COUNT = 20;
 const float SLOPE_FACTOR = 2;
+
+bool LOG = false;
+bool KEY = true;
 
 // Pins
 const int ledPin = 11;
@@ -43,7 +46,7 @@ void setup() {
   state = INITIALIZING;
   rawBuffer[0] = rawBuffer[1] = rawBuffer[2] = reading;
   filteredReading = reading;
-  Serial.begin(9600);
+  if(LOG) Serial.begin(9600);
   delay(1000);
 }
 
@@ -52,7 +55,7 @@ void loop() {
   filter();
   setState();
   sendKeystroke();
-  delay(10);
+  if(LOG) delay(10); else delay(10);
 }
 
 // Step 1: Remove spikes from the reading
@@ -68,7 +71,7 @@ void filter() {
   if (delta < SPIKE_THRESHOLD) {
     filteredReading = rawBuffer[1];
   } else {
-    //Serial.print("!");
+    //if(LOG) Serial.print("!");
     filteredReading = (rawBuffer[0] + rawBuffer[2])/2;
   }
 }
@@ -78,14 +81,14 @@ void setState() {
   // If we're initializing, take 10 measurements to find the baseline
   if (state == INITIALIZING) {
     defaultReadingSum += filteredReading;
-    Serial.println(filteredReading);
+    if(LOG) Serial.println(filteredReading);
     initializationStep++;
     if (initializationStep == 10) {
       defaultReading = defaultReadingSum / 10;
       state = READY;
-      Serial.print("AVG ");
-      Serial.print(defaultReading);
-      Serial.println(".");
+      if(LOG) Serial.print("AVG ");
+      if(LOG) Serial.print(defaultReading);
+      if(LOG) Serial.println(".");
     }
     return;
   }
@@ -94,8 +97,8 @@ void setState() {
     listeningStep++;
   } else {
     if (listeningStep > 0) {
-      //Serial.print("STOP: ");
-      //Serial.println(filteredReading);
+      //if(LOG) Serial.print("STOP: ");
+      //if(LOG) Serial.println(filteredReading);
     }
     state = READY;
     listeningStep = 0;
@@ -111,21 +114,22 @@ void setState() {
       slopeSum = 0;
       return;
     } else if (listeningStep < LISTEN_MEASURE_COUNT + LISTEN_IGNORE_COUNT) {
-      Serial.println(slope);
+      if(LOG) Serial.println(slope);
       slopeSum += slope;
     } else if (listeningStep == LISTEN_MEASURE_COUNT + LISTEN_IGNORE_COUNT) {
-      Serial.print("Decide ");
-      Serial.println(slopeSum);
+      sentSingleCommand = false;
+      if(LOG) Serial.print("Decide ");
+      if(LOG) Serial.println(slopeSum);
       if (slopeSum > LISTEN_MEASURE_COUNT * SLOPE_FACTOR) {
-        Serial.println("Up");
+        if(LOG) Serial.println("Up");
         gesture = VOLUMEUP;
       }
       else if (slopeSum < LISTEN_MEASURE_COUNT * SLOPE_FACTOR * (-1)) {
-        Serial.println("Down");
+        if(LOG) Serial.println("Down");
         gesture = VOLUMEDOWN;
       }
       else {
-        Serial.println("Play pause");
+        if(LOG) Serial.println("Play pause");
         gesture = PLAYPAUSE;
       }
     }
@@ -141,8 +145,8 @@ void sendKeystroke()
     case PLAYPAUSE:
       if (!sentSingleCommand)
       {
-        //Keyboard.press(KEY_MEDIA_PLAY_PAUSE);
-        //Keyboard.release(KEY_MEDIA_PLAY_PAUSE);
+        if(KEY) Keyboard.press(KEY_MEDIA_PLAY_PAUSE);
+        if(KEY) Keyboard.release(KEY_MEDIA_PLAY_PAUSE);
         sentSingleCommand = true;
       }
       break;
@@ -155,12 +159,14 @@ void sendKeystroke()
       }
       break;*/ 
     case VOLUMEUP:
-      //Keyboard.press(KEY_MEDIA_VOLUME_INC);
-      //Keyboard.release(KEY_MEDIA_VOLUME_INC);
+      if(KEY) Keyboard.press(KEY_MEDIA_VOLUME_INC);
+      if(KEY) Keyboard.release(KEY_MEDIA_VOLUME_INC);
+      delay(120);
       break;
     case VOLUMEDOWN:
-      //Keyboard.press(KEY_MEDIA_VOLUME_DEC);
-      //Keyboard.release(KEY_MEDIA_VOLUME_DEC);
+      if(KEY) Keyboard.press(KEY_MEDIA_VOLUME_DEC);
+      if(KEY) Keyboard.release(KEY_MEDIA_VOLUME_DEC);
+      delay(120);
       break;
   }
 }
